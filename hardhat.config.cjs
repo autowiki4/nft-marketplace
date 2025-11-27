@@ -1,9 +1,10 @@
 const { mainnet, polygonAmoy } = require("@reown/appkit/networks");
 
 require("@nomiclabs/hardhat-waffle");
-const fs = required("fs");
-const privateKey = fs.readFileSync(".secret").toString().trim()();
-const projectId = "3423df6b2f7f46659b77b598e4398bdc";
+require("@nomicfoundation/hardhat-toolbox"); // add this
+require("dotenv").config(); // add this for .env
+
+const { privateKey, projectId } = process.env;
 
 module.exports = {
   defaultNetwork: "hardhat",

@@ -1,0 +1,12 @@
+.exit
+});
+  value: ethers.parseEther("100")
+  to: "0x59b647a42791b3316c0ac8a2f5ec149de22abec8", 
+await funder.sendTransaction({
+await funder.sendTransaction({ to:"0xa99484693d90a4db191f7d1bc03efde65a9caa2053d89cb412eb2d4218c172b0", value: ethers.parseEther("100")});
+});
+  value: ethers.parseEther("100")
+  to: "0xa99484693d90a4db191f7d1bc03efde65a9caa2053d89cb412eb2d4218c172b0", 
+await funder.sendTransaction({
+console.log("Funder address:", await funder.getAddress());
+const [funder] = await ethers.getSigners();

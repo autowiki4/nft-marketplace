@@ -1,103 +1,140 @@
-import Image from "next/image";
+"use client";
+
+import { useEffect, useState } from "react";
+import { ethers } from "ethers";
+import axios from "axios";
+import Web3Modal from "web3modal";
+import { nftaddress, nftmarketaddress } from "../../config";
+import NFTMarket from "../../artifacts/contracts/NFTMarket.sol/NFTMarket.json";
+
+type NftItem = {
+  price: string;
+  tokenId: number;
+  seller: string;
+  owner: string;
+  image: string;
+  name: string;
+  description: string;
+};
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [nfts, setNfts] = useState<NftItem[]>([]);
+  const [loadingState, setLoadingState] = useState<"not-loaded" | "loaded">(
+    "not-loaded"
+  );
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  useEffect(() => {
+    loadNFTs();
+  }, []);
+
+  async function loadNFTs() {
+    // Generic provider and query for unsold market items
+    const web3Modal = new Web3Modal();
+    const connection = await web3Modal.connect();
+    const provider = new ethers.BrowserProvider(connection);
+
+    // ✅ Check correct network
+    const network = await provider.getNetwork();
+    if (network.chainId !== 80002n) {
+      // Polygon Amoy
+      alert("Switch MetaMask to Polygon Amoy (Chain ID 80002)");
+      return [];
+    }
+
+    const signer = await provider.getSigner();
+    const contract = new ethers.Contract(
+      nftmarketaddress,
+      NFTMarket.abi,
+      signer
+    );
+
+    const data = await contract.fetchMarketItems();
+
+    // Map items and fetch metadata
+    const items: NftItem[] = await Promise.all(
+      data.map(async (i: any) => {
+        const tokenUri = await contract.tokenURI(i.tokenId);
+        const meta = await axios.get(tokenUri);
+
+        const price = ethers.formatUnits(i.price.toString(), "ether"); // v6
+
+        return {
+          price,
+          tokenId: Number(i.tokenId),
+          seller: i.seller,
+          owner: i.owner,
+          image: meta.data.image,
+          name: meta.data.name,
+          description: meta.data.description,
+        };
+      })
+    );
+
+    setNfts(items);
+    setLoadingState("loaded");
+  }
+
+  async function buyNft(nft: NftItem) {
+    // User signs tx via wallet
+    const web3Modal = new Web3Modal();
+    const connection = await web3Modal.connect();
+    const provider = new ethers.BrowserProvider(connection); // v6
+    const signer = await provider.getSigner();
+    const contract = new ethers.Contract(
+      nftmarketaddress,
+      NFTMarket.abi,
+      signer
+    );
+
+    const price = ethers.parseUnits(nft.price.toString(), "ether"); // v6
+
+    const transaction = await contract.createMarketSale(
+      nftaddress,
+      nft.tokenId,
+      {
+        value: price,
+      }
+    );
+
+    await transaction.wait();
+    loadNFTs();
+  }
+
+  if (loadingState === "loaded" && !nfts.length) {
+    return <h1 className="px-20 py-10 text-3xl">No items in marketplace</h1>;
+  }
+
+  return (
+    <div className="flex justify-center">
+      <div className="px-4" style={{ maxWidth: "1600px" }}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4">
+          {nfts.map((nft, i) => (
+            <div key={i} className="border shadow rounded-xl overflow-hidden">
+              <img src={nft.image} alt={nft.name} />
+              <div className="p-4">
+                <p
+                  style={{ height: "64px" }}
+                  className="text-2xl font-semibold"
+                >
+                  {nft.name}
+                </p>
+                <div style={{ height: "70px", overflow: "hidden" }}>
+                  <p className="text-gray-400">{nft.description}</p>
+                </div>
+              </div>
+              <div className="p-4 bg-black">
+                <p className="text-2xl font-bold text-white">{nft.price} ETH</p>
+                <button
+                  className="mt-4 w-full bg-pink-500 text-white font-bold py-2 px-12 rounded"
+                  onClick={() => buyNft(nft)}
+                >
+                  Buy
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      </div>
     </div>
   );
 }

@@ -17,10 +17,12 @@
     "axios": "^1.12.2",
     "ethers": "^6.15.0",
     "hardhat": "^2.26.3",
+    "ipfs-http-client": "^60.0.1",
     "kubo-rpc-client": "^6.0.2",
     "next": "15.5.5",
     "react": "19.1.0",
-    "react-dom": "19.1.0"
+    "react-dom": "19.1.0",
+    "web3modal": "^1.9.12"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
